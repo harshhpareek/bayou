@@ -1,10 +1,10 @@
 package ut.distcomp.framework;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 
 public class Client extends Process {
 	int client_id;
-	int cid=0;
+	int wid=0;
 
 	public Client(Env env, ProcessId me, int client_id){
 		this.env=env;
@@ -21,26 +21,58 @@ public class Client extends Process {
 			BayouMessage msg = getNextMessage();
 			if(msg instanceof ClientUpdateMessage){				
 				ClientUpdateMessage m = (ClientUpdateMessage) msg;
-				cid++;
-				sendMessage(m.dst, new UpdateMessage(me, m.updateStr,cid));
-				/*if(myConnectedNode()!=null)
-					sendMessage(myConnectedNode(), new UpdateMessage(me, m.updateStr,cid));
-				else{
-					System.err.println(me+" not connected to any node");
-				}*/
+				sendMessage(m.dst, new WIDQuery(me, client_id));
+				ArrayList<BayouMessage> pendingMessages = new ArrayList<BayouMessage>();
+				while(true){
+					BayouMessage msg1 = getNextMessage();
+					if(msg1 instanceof WIDMsg){
+						WIDMsg m1 = (WIDMsg) msg1;
+						if((m1.WID==0 && wid==0) || m1.WID==wid){
+							wid++;
+							sendMessage(m.dst, new UpdateMessage(me, m.updateStr,wid, client_id));
+							break;
+						} else{
+							System.err.println("Server not up to date. nodeID is: "+m1.src+" and Server_wid="+m1.WID+" My wid="+wid+" at clientID: "+client_id+" and command is: "+m.updateStr);
+							//TODO maybe do roundrobin
+							break;
+						}
+					}
+					else{
+						pendingMessages.add(msg1);
+					}
+				}
+				for(BayouMessage m2:pendingMessages){
+					deliver(m2);
+				}
 			}
 			else if(msg instanceof ClientQueryMessage){
 				ClientQueryMessage m = (ClientQueryMessage) msg;
-				sendMessage(m.dst, new QueryMessage(me, m.songName,cid));
-				/*if(myConnectedNode()!=null)
-					sendMessage(myConnectedNode(), new QueryMessage(me, m.songName,cid));
-				else{
-					System.err.println(me+" not connected to any node");
-				}*/
+				sendMessage(m.dst, new WIDQuery(me, client_id));
+				ArrayList<BayouMessage> pendingMessages = new ArrayList<BayouMessage>();
+				while(true){
+					BayouMessage msg1 = getNextMessage();
+					if(msg1 instanceof WIDMsg){
+						WIDMsg m1 = (WIDMsg) msg1;
+						if(m1.WID==wid){
+							sendMessage(m.dst, new QueryMessage(me, m.songName,wid, client_id));
+							break;
+						} else{
+							//TODO maybe do roundrobin
+							System.err.println("Server not up to date. nodeID is: "+m1.src+" and Server_wid="+m1.WID+" My wid="+wid+" at clientID: "+client_id+" and command is: "+m.songName);
+							break;
+						}
+					}
+					else{
+						pendingMessages.add(msg1);
+					}
+				}
+				for(BayouMessage m2:pendingMessages){
+					deliver(m2);
+				}
 			}
 			else if(msg instanceof ResponseMessage){
 				ResponseMessage m = (ResponseMessage) msg;
-				System.err.println("Received response "+m.response+" from "+m.src);
+				System.err.println("Received response "+m.response+" from "+m.src+" at client: "+client_id);
 			}
 		}
 	}

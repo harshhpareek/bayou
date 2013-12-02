@@ -1,7 +1,5 @@
 package ut.distcomp.framework;
 
-import java.util.Arrays;
-
 public class ConnectionMatrix {
 	Boolean[][] connections;
 	int maxNodes;

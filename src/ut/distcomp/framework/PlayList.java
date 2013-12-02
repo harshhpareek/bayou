@@ -4,7 +4,10 @@ import java.util.Hashtable;
 
 public class PlayList {
 	Hashtable<String, String> playlist = new Hashtable<String, String>();
-	
+	private enum Command {
+	    add,delete,edit;
+	}
+
 	void add(String songName, String URL){
 		if(!playlist.containsKey(songName))
 			playlist.put(songName,URL);
@@ -28,17 +31,24 @@ public class PlayList {
 	}
 
 	public void execute(String updateStr){
-		if(1==1)return;
 		String[] s=updateStr.split("[\\[;\\]]");
-		switch(s[0]){
-		case "add":
+		Command command = Command.valueOf(s[0]);
+		switch(command){
+		case add:
 			add(s[1],s[2]);
-		case "delete":
+			break;
+		case delete:
 			delete(s[1]);
-		case "edit":
+			break;
+		case edit:
 			editUrl(s[1],s[2]);
+			break;
 		default:
 			System.err.println("Unexpected update command: "+s[0]);
 		}
+	}
+
+	public String query(String songName) {
+		return playlist.get(songName);
 	}
 }

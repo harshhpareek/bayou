@@ -10,7 +10,7 @@ import java.util.TreeSet;
 public class Node extends Process{
 	int node_id;
 	String server_id;
-	int CSN=0; //TODO make sure this init is right
+	int CSN=0;
 	int old_CSN=-1;
 	int accept_stamp=0;
 	HashMap<String,Integer> version_vector = new HashMap<String,Integer>(); 
@@ -34,24 +34,20 @@ public class Node extends Process{
 		env.addProc(me, this);
 	}
 
-	public void add_entry(String command){
+	public void add_entry(String command, int wid, int client_id){
 		if(isPrimary){
 			CSN++; accept_stamp++;
-			committedWrites.add(new Write(server_id, accept_stamp, CSN, command));
-			//TODO execute commands in the order they were received everytime something is committed
-			db.execute(command);
-			executeClientRequests();
+			committedWrites.add(new Write(server_id, accept_stamp, CSN, command, wid, client_id));
+			if(command.split(";")[0].equals("creation") || command.split(";")[0].equals("retire"))
+				;
+			else
+				db.execute(command);
 		}
 		else{
 			accept_stamp++;
-			tentativeWrites.add(new Write(server_id, accept_stamp, -1, command));
+			tentativeWrites.add(new Write(server_id, accept_stamp, -1, command, wid, client_id));
 		}
-		version_vector.put(server_id,accept_stamp); //TODO I always update vv with accept_stamp
-	}
-
-	private void executeClientRequests() {
-		// TODO handle buffered client requests
-
+		version_vector.put(server_id,accept_stamp);
 	}
 
 	int CompleteV(HashMap<String,Integer> r_versionVector, String w_serverID){
@@ -79,10 +75,10 @@ public class Node extends Process{
 				Write cw = it.next();
 				if(cw.CSN>r_csn){
 					int r_accept_stamp = CompleteV(r_versionVector,cw.serverID);
-					if(r_accept_stamp<inf){
+					//System.err.println(r_server_id+" had accept stamp in anti entropy "+r_accept_stamp);
 						if(cw.accept_stamp<=r_accept_stamp)
 							sendMessage(R,new CommitNotification(me, cw.accept_stamp, cw.serverID, cw.CSN));
-						else
+						else if(r_accept_stamp<inf){
 							sendMessage(R, new WriteMessage(me, cw));
 					}
 				}
@@ -97,24 +93,45 @@ public class Node extends Process{
 					sendMessage(R, new WriteMessage(me, tw));
 			}
 		}
-		//TODO handle interruptions in antientropy, through ACK
+
 		if(exitOnNextAntientropy)
-			exitFlag = true;
+		{
+			sendMessage(R, new endOfAntiEntropy(me));
+			ArrayList<BayouMessage> pendingMessages = new ArrayList<BayouMessage>();
+			long start = System.currentTimeMillis();
+			while(System.currentTimeMillis() - start <1000L){
+				BayouMessage msg1 = getNextMessage(1000L);
+				if(msg1 instanceof ACK){
+					if(isPrimary){
+						System.err.println(msg1.src+" is the new primary");
+						sendMessage(msg1.src, new YouArePrimaryMessage(me)); //TODO but ACK for this?
+					}
+					exitFlag = true;
+					printLog();
+					break;
+				} else if(msg1==null){
+
+				}
+				else{
+					pendingMessages.add(msg1);
+				}
+			}
+			for(BayouMessage m2:pendingMessages){
+				deliver(m2);
+			}
+		}
 	}
 
 	public void retire(){
 		acceptingClientRequests=false;
-		//TODO anything special if primary decides to retire. Make new primary?
-		add_entry("retire;"+me+";"+server_id);
+		System.err.println(me+" got retirement command and no longer accepting client requests");
+		add_entry("retire;"+me+";"+server_id, -1, -1);
 		exitOnNextAntientropy=true;
 	}
 
 	public void printLog(){
 		System.out.println(server_id+" accept_stamp= "+accept_stamp+" CSN="+CSN+"\nCommited Writelog for "+server_id+":"+committedWrites+"\n"+"Tentative Writelog for "+server_id+":"+tentativeWrites + " version_vector "+version_vector);
 		System.out.flush();
-		/*System.out.println("Log for "+me+":");
-		for(Write w:committedWrites)
-			System.out.print(w);*/
 	}
 
 	@Override
@@ -124,7 +141,7 @@ public class Node extends Process{
 		if(isPrimary){
 			//Entering an empty environment.
 			server_id=accept_stamp+":"+"primary";
-			add_entry("creation;"+me+";"+server_id);
+			add_entry("creation;"+me+";"+server_id, -1, -1);
 		}
 		else{
 			boolean sentMessage=false;
@@ -159,7 +176,7 @@ public class Node extends Process{
 			//printLog();
 			//delay(500);
 			if(inbox.ll.isEmpty()){ 
-				Boolean newInformation = false; //TODO set newInformation to false when there is nothing
+				Boolean newInformation = false;
 				if(old_version_vector==null){
 					newInformation = true;
 				} else if(!old_version_vector.equals(version_vector)){
@@ -172,14 +189,11 @@ public class Node extends Process{
 					old_version_vector = (HashMap<String, Integer>) version_vector.clone();
 					old_CSN = CSN;
 					delay(2000);
-					//TODO send only if version vector has changed since last execution
 					for(ProcessId nodeid: env.Nodes.nodes){
 						sendMessage(nodeid, new askAntiEntropyInfo(me));
 					}
 				}
 			}
-			//TODO current code sends too many askAntiEntropy. Just send one and wait for a round of responses. Then send another. Maybe send one when you receive a response, or have new info to send
-			// or have a timeout
 			BayouMessage m = getNextMessage();
 			if(m instanceof AntiEntropyInfoMessage){
 				AntiEntropyInfoMessage msg = (AntiEntropyInfoMessage) m;
@@ -201,23 +215,21 @@ public class Node extends Process{
 				CreationMessage msg = (CreationMessage) m;
 				sendMessage(msg.src, new ServerIDMessage(me, accept_stamp+":"+server_id,server_id));
 				String new_server_id = accept_stamp+":"+server_id;
-				version_vector.put(new_server_id,accept_stamp); //TODO check
-				add_entry("creation;"+msg.src.name+";"+new_server_id);
+				version_vector.put(new_server_id,accept_stamp);
+				add_entry("creation;"+msg.src.name+";"+new_server_id, -1, -1);
 				System.out.println(me+" assigned server_id "+new_server_id+" to "+msg.src);
 			}
 			else if(m instanceof UpdateMessage){
 				UpdateMessage msg = (UpdateMessage) m;
 				if(acceptingClientRequests){
-					//TODO use cid
-					add_entry(msg.updateStr);
+					add_entry(msg.updateStr, msg.wid, msg.client_id);
 				}
 				else
 					System.err.println("Not accepting client requests. Dropped: "+msg.updateStr);
 			}
 			else if(m instanceof QueryMessage){
 				QueryMessage msg = (QueryMessage) m;
-				//TODO Ensure RYW through cid. Buffer message
-				sendMessage(msg.src, new ResponseMessage(me, "Not responding to queries right now"));
+				sendMessage(msg.src, new ResponseMessage(me, db.query(msg.songName)));
 			}
 			else if(m instanceof CommitNotification){
 				CommitNotification msg = (CommitNotification) m;
@@ -228,9 +240,10 @@ public class Node extends Process{
 				if(!isPrimary){
 					if(isNewMsg(msg)){
 						if(version_vector.containsKey(msg.w.serverID)){
-							version_vector.put(msg.w.serverID, msg.w.accept_stamp);
-							if(msg.w.CSN==-1)
+							if(msg.w.CSN==-1){
 								tentativeWrites.add(msg.w);
+								version_vector.put(msg.w.serverID, msg.w.accept_stamp);
+							}
 							else
 								commitNewWrite(msg.w);
 						}
@@ -238,7 +251,6 @@ public class Node extends Process{
 				}
 				else{
 					if(isNewMsg(msg)){
-						//TODO do we always commit right away?
 						if(version_vector.containsKey(msg.w.serverID)){
 							version_vector.put(msg.w.serverID, msg.w.accept_stamp);
 							CSN++; msg.w.CSN=CSN;
@@ -253,18 +265,31 @@ public class Node extends Process{
 						version_vector.put(new_server_id, accept_stamp);
 				}
 				else if(msg.w.command.split(";")[0].equals("retire")){
-					//TODO handle case where write is a retirement write
 					String retiring_server_id = msg.w.command.split(";")[2];
 					version_vector.remove(retiring_server_id);
 				}
 			}
 			else if(m instanceof YouArePrimaryMessage){
-				//TODO nobody sends this yet. Required if primary ever leaves - > only if primary allowed to retire
 				isPrimary=true;
 				commitAllTentativeWrites();
+				System.err.println(node_id+" is the new Primary");
+			}
+			else if(m instanceof WIDQuery){
+				WIDQuery msg = (WIDQuery) m;
+				int max_wid=0;
+				for(Write w: committedWrites){
+					if(w.client_id==msg.client_id && w.wid > max_wid){
+						max_wid = w.wid;
+					}
+				}
+				sendMessage(msg.src, new WIDMsg(me, max_wid));
+			}
+			else if(m instanceof endOfAntiEntropy){
+				//TODO: check for simulataneous retiring and then send ACK
+				sendMessage(m.src, new ACK(me));
 			}
 		}
-		env.Nodes.remove(node_id); //TODO rename node_id to my_id
+		env.Nodes.remove(node_id);
 		env.connections.isolate(node_id);
 	}
 
@@ -297,10 +322,13 @@ public class Node extends Process{
 		else{
 			committedWrites.add(r_w);
 			CSN=r_w.CSN;
+			version_vector.put(r_w.serverID, r_w.accept_stamp);
+			if(r_w.command.split(";")[0].equals("creation") || r_w.command.split(";")[0].equals("retire"))
+				return;
 			db.execute(r_w.command);
-			executeClientRequests();
 		}
 	}
+
 	private void commitTentativeWrite(int sw_accept_stamp, String sw_serverID, int sw_csn) {
 		System.out.println(server_id + " trying commitTentativeWrite for ("+sw_accept_stamp+","+sw_serverID+","+sw_csn+")");
 		if(CSN>=sw_csn)
@@ -310,25 +338,31 @@ public class Node extends Process{
 			Write tw = it.next();
 			if(tw.accept_stamp==sw_accept_stamp){
 				if(tw.serverID.equals(sw_serverID)){
+					//System.err.println(server_id +" Committing tentative write "+tw);
 					if(sw_csn!=CSN+1)
 						System.err.println("CSN is more than it should be");
 					else{
 						System.err.println(server_id +" Committing tentative write "+tw);
 						CSN=sw_csn;
-						committedWrites.add(new Write(sw_serverID,sw_accept_stamp,sw_csn,tw.command));
-						db.execute(tw.command);
-						executeClientRequests();
+						committedWrites.add(new Write(sw_serverID,sw_accept_stamp,sw_csn,tw.command, tw.wid, tw.client_id));
 						it.remove();
+						System.err.println("Committed write "+tw);
+						if(tw.command.split(";")[0].equals("creation") || tw.command.split(";")[0].equals("retire"))
+							return;
+						db.execute(tw.command);
 					}
-					//TODO execute commands in the order they were received
 				}
 			}
 		}
 	}
-	//TODO: required only if primary is allwoed to retire
+
 	void commitAllTentativeWrites(){
-		for(Write w:tentativeWrites){
-			//TODO commit it. Avoid concurrentmodification exception
+		Iterator<Write> it = tentativeWrites.iterator(); 
+		while(it.hasNext()){
+			Write tw = it.next();
+			CSN++;
+			committedWrites.add(new Write(tw.serverID, tw.accept_stamp, CSN, tw.command, tw.wid, tw.client_id));
+			it.remove();
 		}
 	}
 }

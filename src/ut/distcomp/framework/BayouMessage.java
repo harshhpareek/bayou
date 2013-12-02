@@ -8,6 +8,16 @@ public class BayouMessage {
 	ProcessId src;
 }
 
+class endOfAntiEntropy extends BayouMessage{
+	public endOfAntiEntropy(ProcessId src){
+		this.src=src;
+	}
+}
+class ACK extends BayouMessage{
+	public ACK(ProcessId src){
+		this.src=src;
+	}
+}
 class YouArePrimaryMessage extends BayouMessage{
 	YouArePrimaryMessage(ProcessId src){
 		this.src = src;
@@ -15,9 +25,10 @@ class YouArePrimaryMessage extends BayouMessage{
 }
 class UpdateMessage extends BayouMessage{
 	String updateStr;
-	int cid;
-	UpdateMessage(ProcessId src, String updateStr, int cid){
-		this.src = src; this.updateStr = updateStr; this.cid=cid;
+	int wid;
+	int client_id;
+	UpdateMessage(ProcessId src, String updateStr, int wid, int client_id){
+		this.src = src; this.updateStr = updateStr; this.wid=wid; this.client_id = client_id;
 	}
 }
 class ClientUpdateMessage extends BayouMessage{
@@ -28,9 +39,9 @@ class ClientUpdateMessage extends BayouMessage{
 	}
 }
 class QueryMessage extends BayouMessage{
-	String songName; int cid;
-	QueryMessage(ProcessId src, String songName, int cid){
-		this.src = src; this.songName = songName;this.cid=cid;
+	String songName; int wid; int client_id;
+	QueryMessage(ProcessId src, String songName, int wid, int client_id){
+		this.src = src; this.songName = songName;this.wid=wid; this.client_id = client_id;
 	}
 } 
 class ClientQueryMessage extends BayouMessage{
@@ -103,3 +114,17 @@ class ServerIDMessage extends BayouMessage{
 		this.parent_id = parent_id;
 	}
 } 
+class WIDQuery extends BayouMessage{
+	int client_id;
+	public WIDQuery(ProcessId src,int client_id) {
+		this.client_id=client_id;
+		this.src=src;
+	}
+}
+class WIDMsg extends BayouMessage{
+	int WID;
+	public WIDMsg(ProcessId src,int WID) {
+		this.src=src;
+		this.WID=WID;
+	}
+}

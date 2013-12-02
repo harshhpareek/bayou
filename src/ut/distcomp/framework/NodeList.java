@@ -3,7 +3,6 @@ package ut.distcomp.framework;
 import java.util.Arrays;
 
 public class NodeList{
-	//TODO implement iterable
 	ProcessId[] nodes;
 	Env env;
 	int numNodes=0;

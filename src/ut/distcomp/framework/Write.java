@@ -5,13 +5,16 @@ public class Write implements Comparable<Write>{
 	int accept_stamp;
 	int CSN=-1;
 	String command;
-	//TODO add clientid and cid?
+	int client_id;
+	int wid=-1;
 
-	public Write(String id, int accept_stamp, int csn, String command){
+	public Write(String id, int accept_stamp, int csn, String command, int wid, int client_id){
 		this.serverID=id;
 		this.accept_stamp=accept_stamp;
 		this.CSN=csn;
 		this.command=command;
+		this.wid = wid;
+		this.client_id = client_id;
 	}
 	
 	public int compareTo(Write c) {
@@ -24,6 +27,6 @@ public class Write implements Comparable<Write>{
 	}
 	
 	public String toString(){
-		return "(serverID="+serverID+",ac_stamp="+accept_stamp+",CSN="+CSN+",command="+command+")";
+		return "(serverID="+serverID+",ac_stamp="+accept_stamp+",CSN="+CSN+",client_id="+client_id+",wid="+wid+",command="+command+")";
 	}
 }

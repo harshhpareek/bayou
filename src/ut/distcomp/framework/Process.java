@@ -16,6 +16,19 @@ public abstract class Process extends Thread {
 		return inbox.bdequeue();
 	}
 
+	BayouMessage getNextMessage(long timeout){
+		if(inbox.ll.size()==0){
+			try {
+				Thread.sleep(0);
+			} catch (InterruptedException e) {
+				System.err.println("getNextMessage delay sleep interrupted");
+				e.printStackTrace();
+			}
+		}
+		return inbox.bdequeue(timeout);
+	}
+
+
 	void sendMessage(ProcessId dst, BayouMessage msg){		
 		if(env.connections.get(me,dst)){
 			if(msg instanceof CommitNotification || msg instanceof WriteMessage)

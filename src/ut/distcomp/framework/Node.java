@@ -310,10 +310,10 @@ public class Node extends Process{
 			Write tw = it.next();
 			if(tw.accept_stamp==sw_accept_stamp){
 				if(tw.serverID.equals(sw_serverID)){
-					System.err.println(server_id +" Committing tentative write "+tw);
 					if(sw_csn!=CSN+1)
 						System.err.println("CSN is more than it should be");
 					else{
+						System.err.println(server_id +" Committing tentative write "+tw);
 						CSN=sw_csn;
 						committedWrites.add(new Write(sw_serverID,sw_accept_stamp,sw_csn,tw.command));
 						db.execute(tw.command);

@@ -67,24 +67,17 @@ public class Node extends Process{
 	}
 
 	public void anti_entropy(ProcessId R, HashMap<String,Integer> r_versionVector, int r_csn, String r_server_id){
-		//System.out.println(me+" doing anti_entropy with "+R+"\n"+"my vv "+version_vector + " his vv "+r_versionVector);
-		//printLog();
 		if(r_csn<CSN){
 			Iterator<Write> it = committedWrites.iterator(); 
 			while(it.hasNext()){
 				Write cw = it.next();
 				if(cw.CSN>r_csn){
-					/*if(r_csn==0 && cw.CSN==1)
-						sendMessage(R, new WriteMessage(me,cw));*/
-					//else{
 					int r_accept_stamp = CompleteV(r_versionVector,cw.serverID);
-					//System.err.println(r_server_id+" had accept stamp in anti entropy "+r_accept_stamp);
 					if(cw.accept_stamp<=r_accept_stamp)
 						sendMessage(R,new CommitNotification(me, cw.accept_stamp, cw.serverID, cw.CSN));
 					else if(r_accept_stamp<inf){
 						sendMessage(R, new WriteMessage(me, cw));
 					}
-					//}
 				}
 			}
 		}
@@ -92,10 +85,8 @@ public class Node extends Process{
 		while(it.hasNext()){
 			Write tw = it.next();
 			int r_accept_stamp = CompleteV(r_versionVector,tw.serverID);
-			if(r_accept_stamp<inf){
-				if(r_accept_stamp<tw.accept_stamp)
-					sendMessage(R, new WriteMessage(me, tw));
-			}
+			if(r_accept_stamp<tw.accept_stamp)
+				sendMessage(R, new WriteMessage(me, tw));
 		}
 
 		if(exitOnNextAntientropy)
@@ -103,12 +94,12 @@ public class Node extends Process{
 			sendMessage(R, new endOfAntiEntropy(me));
 			ArrayList<BayouMessage> pendingMessages = new ArrayList<BayouMessage>();
 			long start = System.currentTimeMillis();
-			while(System.currentTimeMillis() - start <1000L){
-				BayouMessage msg1 = getNextMessage(1000L);
+			while(System.currentTimeMillis() - start <5000L){
+				BayouMessage msg1 = getNextMessage(5000L);
 				if(msg1 instanceof ACK){
 					if(isPrimary){
 						System.err.println(msg1.src+" is the new primary");
-						sendMessage(msg1.src, new YouArePrimaryMessage(me)); //TODO but ACK for this?
+						sendMessage(msg1.src, new YouArePrimaryMessage(me));
 					}
 					exitFlag = true;
 					printLog();
@@ -159,20 +150,20 @@ public class Node extends Process{
 				}
 				long start = System.currentTimeMillis();
 				while(System.currentTimeMillis()-start<5000L){ //TODO decide timeout here
-				BayouMessage m = getNextMessage(5000L);
-				if(m instanceof ServerIDMessage){
-					ServerIDMessage msg = (ServerIDMessage) m;
-					server_id = msg.server_id;
-					accept_stamp = Integer.parseInt(server_id.split(":")[0]);
-					System.out.println(me+" was assigned server_id "+server_id);
-					version_vector.put(server_id,accept_stamp);
-					version_vector.put(msg.parent_id,-inf);
-					gotId=true;
-					sendMessage(msg.src,new ACK(me));
-					break;
-				}
-				else
-					pendingMessages.add(m);
+					BayouMessage m = getNextMessage(5000L);
+					if(m instanceof ServerIDMessage){
+						ServerIDMessage msg = (ServerIDMessage) m;
+						server_id = msg.server_id;
+						accept_stamp = Integer.parseInt(server_id.split(":")[0]);
+						System.out.println(me+" was assigned server_id "+server_id);
+						version_vector.put(server_id,accept_stamp);
+						version_vector.put(msg.parent_id,-inf);
+						gotId=true;
+						sendMessage(msg.src,new ACK(me));
+						break;
+					}
+					else
+						pendingMessages.add(m);
 				}
 			}
 			for(BayouMessage m: pendingMessages)
@@ -207,10 +198,10 @@ public class Node extends Process{
 					AntiEntropyInfoMessage msg = (AntiEntropyInfoMessage) m;
 					anti_entropy(msg.src,msg.versionVector,msg.CSN, msg.server_id);
 				}else if(m instanceof askAntiEntropyInfo){
-						askAntiEntropyInfo msg = (askAntiEntropyInfo) m;
-						if(msg.src!=me){
-							sendMessage(msg.src, new AntiEntropyInfoMessage(me, version_vector, CSN,server_id));
-						}
+					askAntiEntropyInfo msg = (askAntiEntropyInfo) m;
+					if(msg.src!=me){
+						sendMessage(msg.src, new AntiEntropyInfoMessage(me, version_vector, CSN,server_id));
+					}
 				}else if(m instanceof PrintLogMessage){
 					printLog();
 				}
@@ -237,8 +228,8 @@ public class Node extends Process{
 				String new_server_id = accept_stamp+":"+server_id;
 				ArrayList<BayouMessage> pendingMessages = new ArrayList<BayouMessage>();
 				long start = System.currentTimeMillis();
-				while(System.currentTimeMillis() - start <1000L){
-					BayouMessage msg1 = getNextMessage(1000L);
+				while(System.currentTimeMillis() - start <5000L){
+					BayouMessage msg1 = getNextMessage(5000L);
 					if(msg1 instanceof ACK){
 						version_vector.put(new_server_id,-inf);
 						add_entry("creation;"+msg.src.name+";"+new_server_id, -1, -1);
@@ -307,19 +298,18 @@ public class Node extends Process{
 								}
 								else
 									commitNewWrite(msg.w);
+								if(msg.w.command.split(";")[0].equals("creation")){
+									String new_server_id = msg.w.command.split(";")[2];
+									int accept_stamp = Integer.parseInt(new_server_id.split(":")[0]);
+									System.err.println(server_id + "creating "+new_server_id);
+									if(!version_vector.containsKey(new_server_id))
+										version_vector.put(new_server_id, -inf);
+								}
+								else if(msg.w.command.split(";")[0].equals("retire")){
+									String retiring_server_id = msg.w.command.split(";")[2];
+									version_vector.remove(retiring_server_id);
+								}
 							}
-							if(msg.w.command.split(";")[0].equals("creation")){
-								String new_server_id = msg.w.command.split(";")[2];
-								int accept_stamp = Integer.parseInt(new_server_id.split(":")[0]);
-								System.err.println(server_id + "creating "+new_server_id);
-								if(!version_vector.containsKey(new_server_id))
-									version_vector.put(new_server_id, -inf);
-							}
-							else if(msg.w.command.split(";")[0].equals("retire")){
-								String retiring_server_id = msg.w.command.split(";")[2];
-								version_vector.remove(retiring_server_id);
-							}
-							//TODO accept retirement writes only in order
 						}
 					}
 					else{
@@ -328,16 +318,16 @@ public class Node extends Process{
 								version_vector.put(msg.w.serverID, msg.w.accept_stamp);
 								CSN++;
 								committedWrites.add(new Write(msg.w.serverID,msg.w.accept_stamp,CSN,msg.w.command,msg.w.wid,msg.w.client_id));
-							}
-							if(msg.w.command.split(";")[0].equals("creation")){
-								String new_server_id = msg.w.command.split(";")[2];
-								int accept_stamp = Integer.parseInt(new_server_id.split(":")[0]);
-								if(!version_vector.containsKey(new_server_id))
-									version_vector.put(new_server_id, -inf);
-							}
-							else if(msg.w.command.split(";")[0].equals("retire")){
-								String retiring_server_id = msg.w.command.split(";")[2];
-								version_vector.remove(retiring_server_id);
+								if(msg.w.command.split(";")[0].equals("creation")){
+									String new_server_id = msg.w.command.split(";")[2];
+									int accept_stamp = Integer.parseInt(new_server_id.split(":")[0]);
+									if(!version_vector.containsKey(new_server_id))
+										version_vector.put(new_server_id, -inf);
+								}
+								else if(msg.w.command.split(";")[0].equals("retire")){
+									String retiring_server_id = msg.w.command.split(";")[2];
+									version_vector.remove(retiring_server_id);
+								}
 							}
 						}
 					}
@@ -354,13 +344,12 @@ public class Node extends Process{
 				for(Write w: committedWrites){
 					if(w.client_id==msg.client_id){
 						if(w.wid>max_wid)
-						max_wid = w.wid;
+							max_wid = w.wid;
 					}
 				}
 				sendMessage(msg.src, new WIDMsg(me, max_wid));
 			}
 			else if(m instanceof endOfAntiEntropy){
-				//TODO: check for simulataneous retiring and then send ACK
 				sendMessage(m.src, new ACK(me));
 			}
 		}
@@ -407,7 +396,6 @@ public class Node extends Process{
 		if(CSN>=r_w.CSN)
 			return;
 		if(r_w.CSN!=CSN+1)
-			//System.err.println("CSN is more than it should be");
 			;
 		else{
 			System.err.println(server_id+" commitNewWrite "+r_w);
@@ -421,7 +409,6 @@ public class Node extends Process{
 	}
 
 	private void commitTentativeWrite(int sw_accept_stamp, String sw_serverID, int sw_csn) {
-		//System.out.println(server_id + " trying commitTentativeWrite for ("+sw_accept_stamp+","+sw_serverID+","+sw_csn+")");
 		if(CSN>=sw_csn)
 			return;
 		Iterator<Write> it = tentativeWrites.iterator(); 
@@ -429,9 +416,8 @@ public class Node extends Process{
 			Write tw = it.next();
 			if(tw.accept_stamp==sw_accept_stamp){
 				if(tw.serverID.equals(sw_serverID)){
-					//System.err.println(server_id +" Committing tentative write "+tw);
 					if(sw_csn!=CSN+1)
-						System.err.println("CSN is more than it should be");
+						;
 					else{
 						System.err.println(server_id +" Committing tentative write "+tw);
 						CSN=sw_csn;

@@ -17,5 +17,6 @@ delay(10000)
 query(1,song1)
 update(1,add[song3;songUrl3])
 delay(1000)
+recoverConnection(1,2)
 printLog
 pause

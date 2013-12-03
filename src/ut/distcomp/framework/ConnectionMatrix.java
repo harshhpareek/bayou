@@ -4,7 +4,7 @@ public class ConnectionMatrix {
 	Boolean[][] connections;
 	int maxNodes;
 	NodeList Nodes;
-	
+
 	public ConnectionMatrix(int maxNodes, NodeList nodes){
 		this.maxNodes = maxNodes;
 		this.Nodes = nodes;
@@ -13,37 +13,41 @@ public class ConnectionMatrix {
 			for(int j=0;j<maxNodes;j++) 
 				connections[i][j]=false;
 	}
-	
+
 	public void isolate(int i){
 		for(int j=0;j<maxNodes;j++){
 			connections[i][j]=false;
 			connections[j][i]=false;
 		}
+		System.err.println("Node "+i+" is isolated");
 	}
-	
+
 	public void reconnect(int i){
 		for(int j=0;j<maxNodes;j++){
 			connections[i][j]=true;
 			connections[j][i]=true;
 		}
+		System.err.println("Node "+i+" is connected");
 	}
-	
+
 	public void addNode(int i){
 		reconnect(i);
 	}
-	
+
 	public void removeNode(int i){
 		isolate(i);
 	}
-	
+
 	public void breakConnection(int i, int j){
 		connections[i][j]=false;
 		connections[j][i]=false;
+		System.err.println(i+" and "+j+" are disconnected");	
 	}
-	
+
 	public void recoverConnection(int i, int j){
 		connections[i][j]=true;
 		connections[j][i]=true;
+		System.err.println(i+" and "+j+" are reconencted");
 	}
 
 	public boolean get(ProcessId me, ProcessId dst) {

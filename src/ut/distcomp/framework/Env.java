@@ -51,6 +51,7 @@ public class Env {
 	}
 
 	private void process(InputCommand command) {
+		//delay(500);
 		System.out.println("processing "+command);
 		switch(command.command){
 		case "join":
@@ -91,6 +92,10 @@ public class Env {
 			else
 				for(ProcessId nodeid : Nodes.nodes){
 					sendMessage(nodeid, new PrintLogMessage(me));
+					/*if(nodeid!=null){
+						Node n = (Node) procs.get(nodeid);
+					n.printLog();
+					}*/
 				}
 			break;
 		case "pause":

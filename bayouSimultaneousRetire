@@ -1,6 +1,8 @@
 join(1)
 join(2)
 join(3)
+pause
+breakConnection(1,2)
 clientConnect(1,1)
 update(1,add[song1;songUrl1])
 clientConnect(2,3)

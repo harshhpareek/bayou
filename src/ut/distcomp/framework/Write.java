@@ -7,6 +7,7 @@ public class Write implements Comparable<Write>{
 	String command;
 	int client_id;
 	int wid=-1;
+	boolean nonRejectable=false;
 
 	public Write(String id, int accept_stamp, int csn, String command, int wid, int client_id){
 		this.serverID=id;
@@ -16,7 +17,15 @@ public class Write implements Comparable<Write>{
 		this.wid = wid;
 		this.client_id = client_id;
 	}
-	
+	public Write(String id, int accept_stamp, int csn, String command, int wid, int client_id,boolean nonR){
+		this.serverID=id;
+		this.accept_stamp=accept_stamp;
+		this.CSN=csn;
+		this.command=command;
+		this.wid = wid;
+		this.client_id = client_id;
+		this.nonRejectable=nonR;
+	}
 	public int compareTo(Write c) {
 		if(this.CSN!=-1 && c.CSN!=-1)
 			return this.CSN - c.CSN;

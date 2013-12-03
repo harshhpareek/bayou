@@ -29,7 +29,13 @@ public abstract class Process extends Thread {
 	}
 
 
-	void sendMessage(ProcessId dst, BayouMessage msg){		
+	void sendMessage(ProcessId dst, BayouMessage msg){
+		if(dst==null) return;
+		//System.out.println(me+" sending "+msg+" to "+dst);
+		if(me.name.startsWith("client") || dst.name.startsWith("client") || me.name.startsWith("env") || dst.name.startsWith("env")){
+			env.sendMessage(dst, msg);
+			return;
+		}
 		if(env.connections.get(me,dst)){
 			if(msg instanceof CommitNotification || msg instanceof WriteMessage)
 				System.out.println(me+" sending "+msg+" to "+dst);

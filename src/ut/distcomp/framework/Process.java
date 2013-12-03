@@ -28,7 +28,6 @@ public abstract class Process extends Thread {
 		return inbox.bdequeue(timeout);
 	}
 
-
 	void sendMessage(ProcessId dst, BayouMessage msg){
 		if(dst==null) return;
 		//System.out.println(me+" sending "+msg+" to "+dst);
